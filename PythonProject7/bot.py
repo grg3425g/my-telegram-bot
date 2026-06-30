@@ -17,7 +17,7 @@ from aiohttp import web
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8769283823:AAFVxguKLNATg0l7BSnc7yWGhkBqCIygDJo")
 
 # СЮДА НУЖНО ВПИСАТЬ HTTPS-ССЫЛКУ НА ТВОЙ СЕРВЕР (ngrok или Render)
-WEBAPP_URL = os.getenv("WEBAPP_URL", "https://твой-домен.ngrok-free.app")
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://my-telegram-bot-6hzj.onrender.com")
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
