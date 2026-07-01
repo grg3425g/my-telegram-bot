@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Установка напоминания</title>
+    <!-- Подключаем скрипт Telegram Mini Apps -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Используем TailwindCSS для красоты -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Подключаем красивые иконки -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Системные цвета Telegram */
+        :root {
+            --bg-color: var(--tg-theme-bg-color, #ffffff);
+            --secondary-bg: var(--tg-theme-secondary-bg-color, #f3f4f6);
+            --text-color: var(--tg-theme-text-color, #000000);
+            --hint-color: var(--tg-theme-hint-color, #9ca3af);
+            --btn-color: var(--tg-theme-button-color, #3b82f6);
+            --btn-text: var(--tg-theme-button-text-color, #ffffff);
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Кастомные стили для инпутов, чтобы убрать стандартный вид в iOS */
+        input[type="date"], input[type="time"] {
+            -webkit-appearance: none;
+            color: var(--text-color);
+        }
+
+        ::-webkit-calendar-picker-indicator {
+            filter: invert(0.5); /* Немного приглушаем стандартную иконку браузера */
+            cursor: pointer;
+        }
+
+        .tg-input {
+            background-color: var(--secondary-bg);
+            color: var(--text-color);
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+        }
+
+        .tg-input:focus {
+            outline: none;
+            border-color: var(--btn-color);
+            background-color: var(--bg-color);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .tg-input::placeholder {
+            color: var(--hint-color);
+        }
+
+        .tg-hint-text {
+            color: var(--hint-color);
+        }
+
+        /* Стили плашки-переключателя */
+        .segmented-control {
+            background-color: var(--secondary-bg);
+            position: relative;
+            display: flex;
+            padding: 4px;
+            border-radius: 12px;
+        }
+
+        .segmented-pill {
+            position: absolute;
+            top: 4px;
+            bottom: 4px;
+            left: 4px;
+            width: calc(50% - 4px);
+            background-color: var(--bg-color);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1;
+        }
+
+        .segmented-btn {
+            position: relative;
+            z-index: 2;
+            flex: 1;
+            padding: 10px 0;
+            text-align: center;
+            font-size: 0.875rem;
+            font-weight: 600;
+            transition: color 0.3s ease;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-5 pb-10 flex flex-col">
+
+    <div class="max-w-md mx-auto w-full space-y-8 flex-1">
+
+        <!-- Заголовок с иконкой -->
+        <div class="flex flex-col items-center justify-center mt-2 space-y-3 text-center">
+            <div class="w-16 h-16 rounded-full bg-[var(--btn-color)] bg-opacity-10 flex items-center justify-center text-[var(--btn-color)] shadow-sm">
+                <i data-lucide="bell-ring" class="w-8 h-8"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-extrabold tracking-tight">Новое напоминание</h1>
+                <p class="tg-hint-text text-sm mt-1 font-medium">О чем не забыть?</p>
+            </div>
+        </div>
+
+        <!-- Поле текста -->
+        <div class="relative group mt-6">
+            <i data-lucide="message-square" class="absolute top-4 left-4 w-5 h-5 tg-hint-text transition-colors group-focus-within:text-[var(--btn-color)]"></i>
+            <textarea id="reminder-text" rows="3"
+                class="tg-input w-full rounded-2xl pl-12 pr-4 py-4 text-base resize-none shadow-sm"
+                placeholder="Например: Позвонить маме..."></textarea>
+        </div>
+
+        <!-- Выбор дня (Переключатель) -->
+        <div class="space-y-3 mt-4">
+            <label class="font-bold text-sm tracking-wide uppercase tg-hint-text ml-1">День</label>
+            <div class="segmented-control">
+                <div id="slide-pill" class="segmented-pill"></div>
+                <div id="btn-today" class="segmented-btn" style="color: var(--text-color);" onclick="setMode('today')">Сегодня</div>
+                <div id="btn-custom" class="segmented-btn" style="color: var(--hint-color);" onclick="setMode('custom')">Выбрать день</div>
+            </div>
+        </div>
+
+        <!-- Выбор даты (Скрыт по умолчанию с анимацией) -->
+        <div id="date-picker-container" class="transition-all duration-300 ease-in-out opacity-0 max-h-0 overflow-hidden">
+            <div class="relative group mt-1">
+                <i data-lucide="calendar" class="absolute top-1/2 -translate-y-1/2 left-4 w-5 h-5 tg-hint-text transition-colors group-focus-within:text-[var(--btn-color)]"></i>
+                <input type="date" id="reminder-date" class="tg-input w-full rounded-xl pl-12 pr-4 py-3.5 text-base shadow-sm">
+            </div>
+        </div>
+
+        <!-- Выбор времени -->
+        <div class="space-y-3 mt-4">
+            <label class="font-bold text-sm tracking-wide uppercase tg-hint-text ml-1">Время</label>
+            <div class="relative group">
+                <i data-lucide="clock" class="absolute top-1/2 -translate-y-1/2 left-4 w-5 h-5 tg-hint-text transition-colors group-focus-within:text-[var(--btn-color)]"></i>
+                <input type="time" id="reminder-time" class="tg-input w-full rounded-xl pl-12 pr-4 py-3.5 text-base shadow-sm" required>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Кнопка сохранения прикреплена к низу -->
+    <div class="mt-8 max-w-md mx-auto w-full sticky bottom-0 pt-2 pb-2 bg-[var(--bg-color)]">
+        <button id="save-btn" class="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-95 transition-transform" style="background-color: var(--btn-color); color: var(--btn-text);">
+            <i data-lucide="check-circle" class="w-5 h-5"></i>
+            <span>Установить</span>
+        </button>
+    </div>
+
+    <script>
+        // Инициализируем иконки Lucide
+        lucide.createIcons();
+
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        let currentMode = 'today';
+
+        // Устанавливаем сегодняшнюю дату по умолчанию
+        const todayStr = new Date().toISOString().split('T')[0];
+        document.getElementById('reminder-date').value = todayStr;
+        document.getElementById('reminder-date').min = todayStr;
+
+        // Плавное переключение режимов
+        function setMode(mode) {
+            currentMode = mode;
+            const pill = document.getElementById('slide-pill');
+            const btnToday = document.getElementById('btn-today');
+            const btnCustom = document.getElementById('btn-custom');
+            const dateContainer = document.getElementById('date-picker-container');
+
+            if (mode === 'today') {
+                pill.style.transform = 'translateX(0)';
+
+                btnToday.style.color = 'var(--text-color)';
+                btnCustom.style.color = 'var(--hint-color)';
+
+                // Анимация скрытия календаря
+                dateContainer.classList.remove('opacity-100', 'max-h-24', 'mt-4');
+                dateContainer.classList.add('opacity-0', 'max-h-0');
+                document.getElementById('reminder-date').value = todayStr;
+            } else {
+                pill.style.transform = 'translateX(100%)';
+
+                btnCustom.style.color = 'var(--text-color)';
+                btnToday.style.color = 'var(--hint-color)';
+
+                // Анимация появления календаря
+                dateContainer.classList.remove('opacity-0', 'max-h-0');
+                dateContainer.classList.add('opacity-100', 'max-h-24', 'mt-4');
+            }
+        }
+
+        // Логика отправки данных (без изменений, только кнопка)
+        document.getElementById('save-btn').addEventListener('click', () => {
+            const text = document.getElementById('reminder-text').value.trim();
+            const timeStr = document.getElementById('reminder-time').value;
+            const dateStr = document.getElementById('reminder-date').value;
+
+            if (!text) {
+                tg.showAlert("Пожалуйста, напишите о чем вам напомнить!");
+                return;
+            }
+            if (!timeStr) {
+                tg.showAlert("Пожалуйста, выберите время!");
+                return;
+            }
+
+            const finalDateTime = new Date(`${dateStr}T${timeStr}`);
+
+            if (finalDateTime <= new Date()) {
+                tg.showAlert("Это время уже прошло! Выберите время в будущем.");
+                return;
+            }
+
+            const userId = tg.initDataUnsafe?.user?.id || 123456789;
+            const chatId = tg.initDataUnsafe?.chat?.id || userId;
+
+            const payload = {
+                user_id: userId,
+                chat_id: chatId,
+                text: text,
+                timestamp: finalDateTime.getTime()
+            };
+
+            const btn = document.getElementById('save-btn');
+            const btnText = btn.querySelector('span');
+            const btnIcon = btn.querySelector('i');
+
+            btnText.innerText = "Сохранение...";
+            btnIcon.setAttribute('data-lucide', 'loader-2');
+            btnIcon.classList.add('animate-spin');
+            lucide.createIcons();
+            btn.disabled = true;
+
+            fetch('/api/add_reminder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'ok') {
+                    tg.close();
+                } else {
+                    tg.showAlert("Ошибка при сохранении: " + data.error);
+                    resetButton(btn, btnText, btnIcon);
+                }
+            })
+            .catch(error => {
+                tg.showAlert("Ошибка соединения с сервером");
+                resetButton(btn, btnText, btnIcon);
+            });
+        });
+
+        function resetButton(btn, textElement, iconElement) {
+            textElement.innerText = "Установить";
+            iconElement.setAttribute('data-lucide', 'check-circle');
+            iconElement.classList.remove('animate-spin');
+            lucide.createIcons();
+            btn.disabled = false;
+        }
+    </script>
+</body>
+</html>
