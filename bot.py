@@ -9,7 +9,7 @@ import time
 
 # --- ЖЕСТКАЯ КОНФИГУРАЦИЯ ---
 # Мы больше не доверяем переменным окружения, вписываем ссылку жестко:
-TOKEN = os.getenv("BOT_TOKEN", "8769283823:AAFVxguKLNATg0l7BSnc7yWGhkBqCIygDJo")
+TOKEN = os.getenv("BOT_TOKEN", "8769283823:AAGeQ8YmMtW78LnNv0_In5NzyHmCDpM1iEY")
 WEBAPP_URL = "https://my-telegram-bot-6hzj.onrender.com"
 
 logging.basicConfig(level=logging.INFO)
