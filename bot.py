@@ -8,7 +8,6 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, W
 import time
 
 # --- ЖЕСТКАЯ КОНФИГУРАЦИЯ ---
-# Мы больше не доверяем переменным окружения, вписываем ссылку жестко:
 TOKEN = os.getenv("BOT_TOKEN", "8769283823:AAGeQ8YmMtW78LnNv0_In5NzyHmCDpM1iEY")
 WEBAPP_URL = "https://my-telegram-bot-6hzj.onrender.com"
 
@@ -20,12 +19,20 @@ router = Router()
 # --- СИСТЕМА АБСОЛЮТНОГО ПЕРЕХВАТА (MIDDLEWARE) ---
 @web.middleware
 async def force_html_middleware(request, handler):
-    # 1. Если календарь пытается сохранить данные - пропускаем запрос к API
-    if request.path == '/api/add_reminder':
+    # 1. ОБХОД ЗАЩИТЫ БРАУЗЕРА (CORS)
+    # Это чинит "вечное сохранение". Мы разрешаем браузеру отправлять данные.
+    if request.method == 'OPTIONS':
+        return web.Response(headers={
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, ngrok-skip-browser-warning',
+        })
+        
+    # 2. Если календарь пытается сохранить данные - пропускаем запрос к API
+    if request.path.startswith('/api/'):
         return await handler(request)
 
-    # 2. ДЛЯ ВСЕХ ОСТАЛЬНЫХ ЗАПРОСОВ мы принудительно отдаем HTML
-    # Перехватчик срабатывает ДО того, как сервер успеет выдать "Not Found"
+    # 3. ДЛЯ ВСЕХ ОСТАЛЬНЫХ ЗАПРОСОВ мы принудительно отдаем HTML
     current_dir = os.path.dirname(os.path.abspath(__file__))
     file_path = os.path.join(current_dir, 'webapp.html')
     
@@ -34,20 +41,37 @@ async def force_html_middleware(request, handler):
             html_content = f.read()
         return web.Response(text=html_content, content_type='text/html')
     except Exception as e:
-        return web.Response(text=f"<h1>Ошибка</h1><p>Файл webapp.html не найден на диске: {e}</p>", content_type='text/html', status=500)
+        return web.Response(text=f"<h1>Ошибка</h1><p>Файл не найден: {e}</p>", content_type='text/html', status=500)
 
 async def api_add_reminder(request):
-    data = await request.json()
-    logging.info(f"Получены данные от календаря: {data}")
-    return web.json_response({"status": "ok"})
+    try:
+        data = await request.json()
+        logging.info(f"Получены данные от календаря: {data}")
+        
+        # Отправляем подтверждение пользователю прямо в чат!
+        chat_id = data.get('chat_id')
+        text = data.get('text')
+        if chat_id and text:
+            await bot.send_message(
+                chat_id=chat_id, 
+                text=f"✅ <b>Напоминание установлено!</b>\nЯ напомню тебе: <i>{text}</i>",
+                parse_mode="HTML"
+            )
+    except Exception as e:
+        logging.error(f"Ошибка при обработке API: {e}")
+        
+    # Обязательно возвращаем заголовки CORS в успешном ответе
+    return web.json_response(
+        {"status": "ok"}, 
+        headers={'Access-Control-Allow-Origin': '*'}
+    )
 
 async def start_web_server():
     # Подключаем нашего "Вышибалу" (перехватчик) ко всему серверу
     app = web.Application(middlewares=[force_html_middleware])
     app.router.add_post('/api/add_reminder', api_add_reminder)
     
-    # Делаем пустой маршрут-заглушку, чтобы сервер не ругался при старте. 
-    # До него дело всё равно не дойдет, перехватчик сработает раньше.
+    # Делаем пустой маршрут-заглушку
     async def dummy(request): pass
     app.router.add_get('/', dummy)
     app.router.add_get('/{tail:.*}', dummy)
@@ -57,7 +81,7 @@ async def start_web_server():
     port = int(os.environ.get("PORT", 10000))
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
-    logging.info("СЕРВЕР-ПЕРЕХВАТЧИК УСПЕШНО ЗАПУЩЕН")
+    logging.info("СЕРВЕР УСПЕШНО ЗАПУЩЕН")
 
 # --- ЛОГИКА БОТА ---
 @router.message(Command("start"))
@@ -71,7 +95,8 @@ async def cmd_start(message: Message):
             web_app=WebAppInfo(url=url) 
         )]
     ])
-    await message.answer("Перехватчик установлен! Жми на кнопку:", reply_markup=keyboard)
+    # Убрали фразу про перехватчик, вернули красивое приветствие
+    await message.answer("Привет! Нажми на кнопку ниже, чтобы установить напоминание:", reply_markup=keyboard)
 
 # --- ЗАПУСК ---
 async def main():
