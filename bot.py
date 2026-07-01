@@ -10,7 +10,7 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, W
 # ==========================================
 # КОНФИГУРАЦИЯ
 # ==========================================
-TOKEN = os.getenv("BOT_TOKEN", "8769283823:AAFVxguKLNATg0l7BSnc7yWGhkBqCIygDJo")
+TOKEN = os.getenv("BOT_TOKEN", "8769283823:AAEmOWs5A8ZtlNDH2IMZw9c-viX5GcpArRQ")
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://my-telegram-bot-6hzj.onrender.com")
 
 logging.basicConfig(level=logging.INFO)
